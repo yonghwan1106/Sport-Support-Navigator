@@ -1,8 +1,14 @@
 import numpy as np
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
+from utils.constants import MATCHING_WEIGHTS
+from utils.helpers import calculate_similarity_score
 
 class ProgramMatcher:
+    """
+    사용자 프로필과 지원사업 간의 매칭을 수행하는 클래스입니다.
+    Linear Latent Intervention을 활용하여 최적의 매칭을 찾습니다.
+    """
     def __init__(self, processed_data):
         """매칭 엔진 초기화
         
