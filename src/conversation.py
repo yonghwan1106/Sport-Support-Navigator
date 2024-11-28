@@ -1,4 +1,12 @@
+from typing import Dict, List
+import re
+
 class ConversationManager:
+    """
+    사용자와의 대화를 관리하는 클래스입니다.
+    자연스러운 대화를 통해 필요한 정보를 수집합니다.
+    """
+    
     def __init__(self):
         """대화 관리자 초기화"""
         self.conversation_history = []
