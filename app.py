@@ -84,21 +84,10 @@ class SportSupportNavigator:
     def _handle_user_input(self):
         """
         사용자 입력을 처리하고 적절한 응답을 생성합니다.
-        
-        이 메서드는 다음 작업을 수행합니다:
-        1. 사용자 입력 수집
-        2. 입력 내용 처리 및 정보 추출
-        3. 시스템 응답 생성
-        4. 대화 기록 업데이트
         """
-        # 사용자 입력 인터페이스
-        user_input = st.text_input(
-            "메시지를 입력하세요:",
-            key="user_input",
-            placeholder="여기에 메시지를 입력해주세요..."
-        )
+        # 사용자 입력 받기
+        user_input = st.text_input("메시지를 입력하세요:", key="user_input")
         
-        # 새로운 사용자 입력 처리
         if user_input and user_input not in [msg['text'] for msg in st.session_state.conversation_history]:
             # 사용자 입력 기록
             st.session_state.conversation_history.append({
@@ -115,7 +104,7 @@ class SportSupportNavigator:
                 'text': response
             })
             
-            # 사용자 프로필 업데이트
+            # 프로필 업데이트
             st.session_state.user_profile.update(
                 self.conversation_manager.get_current_profile()
             )
@@ -123,9 +112,9 @@ class SportSupportNavigator:
             # 매칭 준비 상태 확인
             if self.conversation_manager.is_profile_complete():
                 st.session_state.ready_for_matching = True
-                
-            # 페이지 리프레시
-            st.experimental_rerun()
+                    
+            # 페이지 리프레시 (수정된 부분)
+            st.rerun()
 
     def _show_matching_results(self):
         """
