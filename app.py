@@ -82,39 +82,35 @@ class SportSupportNavigator:
             })
 
     def _handle_user_input(self):
-        """
-        사용자 입력을 처리하고 적절한 응답을 생성합니다.
-        """
-        # 사용자 입력 받기
-        user_input = st.text_input("메시지를 입력하세요:", key="user_input")
-        
-        if user_input and user_input not in [msg['text'] for msg in st.session_state.conversation_history]:
-            # 사용자 입력 기록
-            st.session_state.conversation_history.append({
-                'type': 'user',
-                'text': user_input
-            })
+        try:
+            user_input = st.text_input("메시지를 입력하세요:", key="user_input")
             
-            # 대화 관리자를 통한 응답 생성
-            response = self.conversation_manager.process_user_input(user_input)
-            
-            # 응답 기록
-            st.session_state.conversation_history.append({
-                'type': 'system',
-                'text': response
-            })
-            
-            # 프로필 업데이트
-            st.session_state.user_profile.update(
-                self.conversation_manager.get_current_profile()
-            )
-            
-            # 매칭 준비 상태 확인
-            if self.conversation_manager.is_profile_complete():
-                st.session_state.ready_for_matching = True
+            if user_input and user_input not in [msg['text'] for msg in st.session_state.conversation_history]:
+                # 사용자 입력 처리
+                with st.spinner('처리중...'):
+                    response = self.conversation_manager.process_user_input(user_input)
                     
-            # 페이지 리프레시 (수정된 부분)
-            st.rerun()
+                    # 대화 기록 업데이트
+                    st.session_state.conversation_history.append({
+                        'type': 'user',
+                        'text': user_input
+                    })
+                    st.session_state.conversation_history.append({
+                        'type': 'system',
+                        'text': response
+                    })
+                    
+                    # 상태 업데이트
+                    st.session_state.user_profile = self.conversation_manager.get_current_profile()
+                    
+                    if self.conversation_manager.is_profile_complete():
+                        st.session_state.ready_for_matching = True
+                    
+                st.rerun()
+        except Exception as e:
+            st.error(f"오류가 발생했습니다: {str(e)}")
+            # 로깅 추가
+            print(f"Error in _handle_user_input: {e}")
 
     def _show_matching_results(self):
         """
