@@ -330,3 +330,102 @@ class ConversationManager:
         """프로필 완성 여부 확인"""
         return self.profile.is_complete()
 
+    def get_initial_message(self) -> str:
+            """
+            대화 시작시 보여줄 초기 메시지를 반환합니다.
+            이 메서드는 Streamlit 인터페이스에서 대화를 시작할 때 사용됩니다.
+            
+            Returns:
+                str: 환영 메시지
+            """
+            initial_message = random.choice(self.templates["initial"])
+            self._add_to_history("system", initial_message)
+            return initial_message
+
+    def reset_conversation(self):
+        """
+        대화 상태를 초기화합니다.
+        새로운 사용자와의 대화를 시작할 때 사용됩니다.
+        """
+        self.profile = UserProfile()
+        self.state = ConversationState.INITIAL
+        self.conversation_history = []
+        self.last_question = None
+        self.logger.info("Conversation reset completed")
+
+    def get_conversation_summary(self) -> Dict:
+        """
+        현재까지의 대화 내용과 수집된 정보를 요약하여 반환합니다.
+        
+        Returns:
+            Dict: 대화 요약 정보를 담은 딕셔너리
+        """
+        return {
+            'profile': self.profile.to_dict(),
+            'state': self.state.value,
+            'conversation_length': len(self.conversation_history),
+            'is_complete': self.profile.is_complete()
+        }
+
+    def get_last_state(self) -> str:
+        """
+        가장 최근의 대화 상태를 반환합니다.
+        
+        Returns:
+            str: 현재 대화 상태
+        """
+        return self.state.value
+
+    def validate_profile(self) -> List[str]:
+        """
+        현재 프로필 정보의 유효성을 검사하고 누락된 정보를 확인합니다.
+        
+        Returns:
+            List[str]: 누락된 정보 목록
+        """
+        missing_fields = []
+        profile_dict = self.profile.to_dict()
+        
+        required_fields = {
+            'stage': '사업 단계',
+            'sector': '사업 분야',
+            'support_needs': '필요한 지원'
+        }
+        
+        for field, display_name in required_fields.items():
+            if not profile_dict.get(field):
+                missing_fields.append(display_name)
+                
+        return missing_fields
+
+    def handle_error(self, error_type: str) -> str:
+        """
+        대화 중 발생하는 다양한 오류 상황을 처리합니다.
+        
+        Args:
+            error_type: 오류 유형
+            
+        Returns:
+            str: 오류에 대한 응답 메시지
+        """
+        error_responses = {
+            'duplicate': "앞서 주신 답변과 동일합니다. 조금 더 구체적으로 말씀해 주시겠어요?",
+            'invalid': "죄송합니다. 잘 이해하지 못했습니다. 다시 한 번 설명해 주시겠어요?",
+            'missing': "몇 가지 정보가 더 필요합니다. 차근차근 여쭤보도록 하겠습니다.",
+            'system': "죄송합니다. 일시적인 오류가 발생했습니다. 다시 시도해 주시겠어요?"
+        }
+        
+        response = error_responses.get(error_type, self.templates["error"])
+        self.logger.warning(f"Error handled: {error_type}")
+        return response
+
+    def __str__(self) -> str:
+        """
+        현재 대화 관리자의 상태를 문자열로 표현합니다.
+        
+        Returns:
+            str: 현재 상태 정보
+        """
+        return (f"ConversationManager(state={self.state.value}, "
+                f"profile_complete={self.profile.is_complete()}, "
+                f"history_length={len(self.conversation_history)})")
