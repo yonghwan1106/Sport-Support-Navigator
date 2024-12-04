@@ -1,7 +1,7 @@
 import streamlit as st
-from dataprocessor import DataProcessor
-from matcher import ProgramMatcher
-from conversation import ConversationManager
+from src.data_processor import DataProcessor
+from src.matcher import ProgramMatcher
+from src.conversation import ConversationManager
 
 class SportSupportNavigator:
     def __init__(self):
