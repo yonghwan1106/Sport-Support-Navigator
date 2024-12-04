@@ -2,6 +2,18 @@ from typing import Dict, List, Optional
 import re
 from dataclasses import dataclass, field
 
+def get_initial_message(self) -> str:
+    """
+    대화 시작시 보여줄 초기 메시지를 반환합니다.
+    
+    Returns:
+        초기 환영 메시지
+    """
+    # 질문 템플릿에서 랜덤하게 초기 메시지를 선택
+    import random
+    initial_messages = self.question_templates['initial']
+    return random.choice(initial_messages)
+    
 @dataclass
 class UserProfile:
     """사용자 프로필 정보를 저장하는 데이터 클래스"""
