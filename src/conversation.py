@@ -42,6 +42,32 @@ class UserProfile:
 
 class ConversationManager:
     """대화 관리 및 정보 수집을 담당하는 클래스"""
+
+    def get_current_profile(self) -> UserProfile:
+    """
+    현재 사용자의 프로필 정보를 반환합니다.
+    이 메서드는 대화 과정에서 수집된 모든 사용자 정보를 포함하는
+    UserProfile 객체를 반환합니다.
+    
+    Returns:
+        UserProfile: 현재까지 수집된 사용자 프로필 정보를 담고 있는 객체
+            - stage: 사업 단계 (예: 아이디어, 초기, 성장)
+            - sector: 사업 분야 (예: 제조, 서비스, 시설)
+            - scale: 사업 규모
+            - support_needs: 필요한 지원 종류
+            - description: 사업 설명
+    """
+    return self.profile
+
+    def is_profile_complete(self) -> bool:
+        """
+        현재 프로필 정보가 충분히 수집되었는지 확인합니다.
+        사업 단계, 분야, 지원 종류와 같은 필수 정보가 모두 있는지 검사합니다.
+        
+        Returns:
+            bool: 필수 정보가 모두 수집되었는지 여부
+        """
+        return self.profile.is_complete()
     
     def __init__(self):
         """대화 관리자를 초기화합니다."""
