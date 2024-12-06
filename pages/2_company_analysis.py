@@ -2,6 +2,7 @@
 
 import streamlit as st
 import pandas as pd
+import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
 from pathlib import Path
@@ -13,32 +14,35 @@ sys.path.append(str(root_dir))
 
 from utils import DataHandler
 
-def create_industry_distribution_chart(df):
+def ensure_numeric(df, column):
     """
-    업종별 기업 분포를 도넛 차트로 시각화합니다.
+    데이터프레임의 특정 컬럼을 숫자형으로 변환합니다.
+    변환할 수 없는 값은 NaN으로 처리됩니다.
     
     매개변수:
-        df (DataFrame): 기업 정보가 담긴 데이터프레임
-        
-    반환값:
-        plotly Figure: 도넛 차트 객체
+        df (DataFrame): 처리할 데이터프레임
+        column (str): 변환할 컬럼명
     """
-    # 업종별 기업 수 계산
-    industry_counts = df['INDUTY_NM'].value_counts()
+    if column in df.columns:
+        df[column] = pd.to_numeric(df[column], errors='coerce')
+    return df
+
+def create_industry_distribution_chart(df):
+    """업종별 기업 분포를 도넛 차트로 시각화합니다."""
+    # 결측치 제외하고 업종별 기업 수 계산
+    industry_counts = df['INDUTY_NM'].dropna().value_counts()
     
-    # 도넛 차트 생성
     fig = px.pie(
         values=industry_counts.values,
         names=industry_counts.index,
         title='업종별 기업 분포',
-        hole=0.4  # 도넛 차트 스타일
+        hole=0.4
     )
     
-    # 차트 레이아웃 설정
     fig.update_layout(
         showlegend=True,
         legend=dict(
-            orientation="h",  # 범례를 수평으로 배치
+            orientation="h",
             yanchor="bottom",
             y=1.02,
             xanchor="right",
@@ -49,19 +53,10 @@ def create_industry_distribution_chart(df):
     return fig
 
 def create_region_distribution_chart(df):
-    """
-    지역별 기업 분포를 막대 차트로 시각화합니다.
+    """지역별 기업 분포를 막대 차트로 시각화합니다."""
+    # 결측치 제외하고 지역별 기업 수 계산
+    region_counts = df['지역'].dropna().value_counts()
     
-    매개변수:
-        df (DataFrame): 기업 정보가 담긴 데이터프레임
-        
-    반환값:
-        plotly Figure: 막대 차트 객체
-    """
-    # 지역별 기업 수 계산
-    region_counts = df['지역'].value_counts()
-    
-    # 막대 차트 생성
     fig = px.bar(
         x=region_counts.index,
         y=region_counts.values,
@@ -69,23 +64,20 @@ def create_region_distribution_chart(df):
         labels={'x': '지역', 'y': '기업 수'}
     )
     
-    # 차트 레이아웃 설정
     fig.update_layout(
-        xaxis_tickangle=-45,  # x축 레이블 기울이기
+        xaxis_tickangle=-45,
         showlegend=False
     )
     
     return fig
 
 def main():
-    # 페이지 기본 설정
     st.set_page_config(
         page_title="기업 분석",
         page_icon="📊",
         layout="wide"
     )
     
-    # 페이지 제목과 설명
     st.title("📊 지원기업 특성 분석")
     st.markdown("""
         이 페이지에서는 스포츠산업 지원사업에 참여한 기업들의 특성을 분석합니다.
@@ -93,23 +85,33 @@ def main():
     """)
 
     try:
-        # 데이터 핸들러 초기화 (경로 매개변수 제거)
+        # 데이터 핸들러 초기화
         data_handler = DataHandler()
         company_df = data_handler.get_company_data()
+        
+        # 연도 컬럼을 숫자형으로 변환
+        company_df = ensure_numeric(company_df, 'APPL_YEAR')
+        company_df = ensure_numeric(company_df, '업력')
 
         # 사이드바 필터 구성
         with st.sidebar:
             st.header("분석 필터")
             
-            # 연도 선택
-            years = sorted(company_df['APPL_YEAR'].unique(), reverse=True)
+            # 연도 선택 (결측치 제외)
+            years = sorted(
+                company_df['APPL_YEAR'].dropna().unique().astype(int),
+                reverse=True
+            )
             selected_year = st.selectbox(
                 "분석 년도",
-                options=years
+                options=years,
+                format_func=lambda x: f"{int(x)}년"
             )
             
-            # 업종 선택
-            industries = ['전체'] + sorted(company_df['INDUTY_NM'].unique())
+            # 업종 선택 (결측치 제외)
+            industries = ['전체'] + sorted(
+                company_df['INDUTY_NM'].dropna().unique()
+            )
             selected_industry = st.selectbox(
                 "업종",
                 options=industries
@@ -117,10 +119,18 @@ def main():
 
         # 데이터 필터링
         filtered_df = company_df.copy()
+        
+        # 연도 필터링 (숫자형으로 비교)
         if selected_year:
-            filtered_df = filtered_df[filtered_df['APPL_YEAR'] == selected_year]
+            filtered_df = filtered_df[
+                filtered_df['APPL_YEAR'].astype(float) == float(selected_year)
+            ]
+            
+        # 업종 필터링
         if selected_industry != '전체':
-            filtered_df = filtered_df[filtered_df['INDUTY_NM'] == selected_industry]
+            filtered_df = filtered_df[
+                filtered_df['INDUTY_NM'] == selected_industry
+            ]
 
         # 주요 지표 표시
         col1, col2, col3, col4 = st.columns(4)
@@ -135,22 +145,24 @@ def main():
             avg_age = filtered_df['업력'].mean()
             st.metric(
                 "평균 업력",
-                f"{avg_age:.1f}년"
+                f"{avg_age:.1f}년" if pd.notna(avg_age) else "정보없음"
             )
         
         with col3:
-            unique_regions = filtered_df['지역'].nunique()
+            unique_regions = filtered_df['지역'].dropna().nunique()
             st.metric(
                 "분포 지역 수",
                 f"{unique_regions}개 지역"
             )
         
         with col4:
-            top_industry = filtered_df['INDUTY_NM'].mode()[0]
+            mode_result = filtered_df['INDUTY_NM'].mode()
+            top_industry = mode_result[0] if len(mode_result) > 0 else "정보없음"
             st.metric(
                 "주요 업종",
-                f"{top_industry}"
+                top_industry
             )
+
 
         # 상세 분석 섹션
         st.header("상세 분석")
@@ -239,7 +251,14 @@ def main():
             
             오류 내용:
             {str(e)}
+            
+            데이터 상태:
+            {company_df.dtypes if 'company_df' in locals() else '데이터 로드 실패'}
         """)
+        # 디버깅을 위한 추가 정보 표시
+        st.write("데이터 샘플:")
+        if 'company_df' in locals():
+            st.write(company_df.head())
 
 if __name__ == "__main__":
     main()
