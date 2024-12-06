@@ -176,3 +176,78 @@ class DataHandler:
     def get_support_categories(self) -> list:
         """지원 분야 목록을 반환합니다."""
         return sorted(self.qualifications_df['APPL_REALM_NM'].unique().tolist())
+
+# 파일 위치: sports-industry-support/utils.py
+# DataHandler 클래스에 다음 메서드를 추가하세요
+
+    def filter_qualifications(
+        self, 
+        year=None, 
+        categories=None, 
+        company_age=None,
+        is_startup=False,
+        min_amount=None,
+        max_amount=None
+    ):
+        """
+        지원사업 데이터를 주어진 조건에 따라 필터링합니다.
+        
+        매개변수:
+            year (int): 지원년도
+            categories (list): 지원분야 목록
+            company_age (int): 기업 업력
+            is_startup (bool): 예비창업자 여부
+            min_amount (float): 최소 지원금액
+            max_amount (float): 최대 지원금액
+        
+        반환값:
+            DataFrame: 필터링된 지원사업 데이터
+        """
+        try:
+            # 기본 데이터 복사
+            filtered_df = self.qualifications_df.copy()
+            
+            # 연도 필터링
+            if year is not None:
+                filtered_df = filtered_df[filtered_df['APPL_YEAR'] == year]
+            
+            # 지원분야 필터링
+            if categories and len(categories) > 0:
+                filtered_df = filtered_df[
+                    filtered_df['APPL_REALM_NM'].isin(categories)
+                ]
+            
+            # 예비창업자 여부에 따른 필터링
+            if is_startup:
+                filtered_df = filtered_df[
+                    filtered_df['APPL_TRGET_PREPFNTN_AT'] == 'Y'
+                ]
+            
+            # 기업 업력 조건 필터링
+            if company_age is not None:
+                # 업력 관련 컬럼이 있는 경우에만 처리
+                if 'APPL_TRGET_RM_CN' in filtered_df.columns:
+                    # 예: "3년 이상" 같은 텍스트에서 숫자 추출
+                    filtered_df = filtered_df[
+                        filtered_df['APPL_TRGET_RM_CN'].str.contains(
+                            str(company_age),
+                            na=False
+                        )
+                    ]
+            
+            # 지원금액 범위 필터링
+            amount_col = 'APPL_SCALE_UNIT_PER_MXMM_APPL_PRICE'
+            if min_amount is not None:
+                filtered_df = filtered_df[
+                    filtered_df[amount_col] >= min_amount
+                ]
+            if max_amount is not None:
+                filtered_df = filtered_df[
+                    filtered_df[amount_col] <= max_amount
+                ]
+            
+            return filtered_df
+            
+        except Exception as e:
+            st.error(f"데이터 필터링 중 오류 발생: {str(e)}")
+            return pd.DataFrame()  # 빈 데이터프레임 반환
