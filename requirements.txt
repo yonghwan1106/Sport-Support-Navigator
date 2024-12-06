@@ -1,4 +1,20 @@
-streamlit>=1.28.0
-pandas>=2.1.0
-numpy>=1.26.0
-scikit-learn>=1.3.0
+# Web Application Framework
+streamlit==1.30.0
+
+# Data Processing and Analysis
+pandas==2.1.4
+numpy==1.26.2
+
+# Data Visualization
+plotly==5.18.0
+
+# Utility Libraries
+python-dateutil==2.8.2
+typing-extensions==4.9.0
+
+# Development Tools
+black==23.12.1
+pytest==7.4.4
+
+# File Handling
+pathlib==1.0.1
