@@ -8,34 +8,26 @@ from pathlib import Path  # 파일 경로 처리를 위한 모듈
 import streamlit as st  # 웹 애플리케이션 구현을 위한 라이브러리
 import pandas as pd  # 데이터 처리를 위한 라이브러리
 
+
 class DataPathHandler:
-    """
-    데이터 파일 경로를 관리하는 클래스입니다.
-    로컬 개발 환경과 배포 환경 모두에서 올바르게 작동하도록 설계되었습니다.
-    """
+    """데이터 파일 경로를 관리하는 클래스입니다."""
     
     def __init__(self):
-        """
-        DataPathHandler를 초기화합니다.
-        실행 환경을 감지하여 적절한 기본 경로를 설정합니다.
-        """
-        # Streamlit Cloud 환경인지 확인
+        # Streamlit Cloud 환경인지 확인하여 적절한 경로 설정
         if os.getenv('STREAMLIT_CLOUD'):
-            # Streamlit Cloud에서 실행 중일 때
             self.base_path = Path.cwd() / 'data'
         else:
-            # 로컬 환경에서 실행 중일 때
-            current_file = Path(__file__).resolve()  # 현재 파일의 절대 경로
-            self.base_path = current_file.parent / 'data'  # data 디렉토리 경로
+            current_file = Path(__file__).resolve()
+            self.base_path = current_file.parent / 'data'
             
-        # data 디렉토리가 존재하는지 확인
+        # 데이터 디렉토리 존재 여부 확인
         if not self.base_path.exists():
             raise FileNotFoundError(
                 f"데이터 디렉토리를 찾을 수 없습니다: {self.base_path}"
             )
 
-    @st.cache_data  # 데이터 캐싱으로 성능 향상
-    def load_csv(self, filename: str) -> pd.DataFrame:
+    @st.cache_data  # 캐시 데코레이터 적용
+    def load_csv(_self, filename: str) -> pd.DataFrame:  # self를 _self로 변경
         """
         CSV 파일을 데이터프레임으로 읽어옵니다.
         
@@ -44,14 +36,10 @@ class DataPathHandler:
             
         반환값:
             pandas.DataFrame: CSV 파일의 내용을 담은 데이터프레임
-            
-        예외:
-            FileNotFoundError: 파일을 찾을 수 없을 때 발생
         """
         # 전체 파일 경로 생성
-        file_path = self.base_path / filename
+        file_path = _self.base_path / filename  # _self 사용
         
-        # 파일 존재 여부 확인
         if not file_path.exists():
             raise FileNotFoundError(
                 f"데이터 파일을 찾을 수 없습니다: {filename}\n"
@@ -59,11 +47,11 @@ class DataPathHandler:
             )
             
         try:
-            # UTF-8 인코딩으로 먼저 시도
+            # 다양한 인코딩 시도
             try:
                 df = pd.read_csv(file_path)
             except UnicodeDecodeError:
-                # UTF-8로 읽기 실패시 cp949(한글 인코딩)로 시도
+                # UTF-8 실패시 cp949로 시도
                 df = pd.read_csv(file_path, encoding='cp949')
                 
             return df
