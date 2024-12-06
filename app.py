@@ -1,169 +1,156 @@
-import streamlit as st
-from src.data_processor import DataProcessor
-from src.matcher import ProgramMatcher
-from src.conversation import ConversationManager
+# app.py
 
-class SportSupportNavigator:
+import streamlit as st
+from pathlib import Path
+import sys
+
+# 프로젝트 루트 디렉토리를 파이썬 경로에 추가
+current_dir = Path(__file__).parent
+sys.path.append(str(current_dir))
+
+# utils.py에서 데이터 핸들러 임포트
+from utils import DataHandler
+
+class SportsSupportApp:
     def __init__(self):
-        """
-        SportSupportNavigator 초기화
+        """애플리케이션을 초기화하고 기본 설정을 구성합니다."""
+        # 데이터 파일 경로 설정
+        self.data_path = current_dir / 'data'
+        # 데이터 핸들러 초기화 (경로 전달)
+        self.data_handler = DataHandler(self.data_path)
         
-        이 클래스는 세 가지 주요 컴포넌트를 통합합니다:
-        1. DataProcessor: 지원사업 데이터 전처리
-        2. ProgramMatcher: 사용자-지원사업 매칭 엔진
-        3. ConversationManager: 대화형 인터페이스 관리
+    def set_page_config(self):
+        """페이지의 기본 구성을 설정합니다."""
+        st.set_page_config(
+            page_title="스포츠산업 지원사업 분석 시스템",
+            page_icon="🎯",
+            layout="wide",
+            initial_sidebar_state="expanded"
+        )
         
-        또한 Streamlit 세션 상태를 초기화하여 대화 기록과 사용자 프로필을 유지합니다.
-        """
-        # 핵심 컴포넌트 초기화
-        try:
-            self.data_processor = DataProcessor()
-            self.processed_data = self.data_processor.preprocess_support_programs()
-            self.matcher = ProgramMatcher(self.processed_data)
-            self.conversation_manager = ConversationManager()
-        except Exception as e:
-            st.error(f"시스템 초기화 중 오류가 발생했습니다: {str(e)}")
-            return
+    def show_welcome_section(self):
+        """환영 섹션을 표시합니다."""
+        st.title("🎯 스포츠산업 지원사업 분석 시스템")
         
-        # Streamlit 세션 상태 초기화
-        if 'conversation_history' not in st.session_state:
-            st.session_state.conversation_history = []
-        if 'user_profile' not in st.session_state:
-            st.session_state.user_profile = {}
-        if 'ready_for_matching' not in st.session_state:
-            st.session_state.ready_for_matching = False
+        st.markdown("""
+        이 시스템은 스포츠산업 지원사업의 자격요건과 지원기업 정보를 종합적으로 분석하여 
+        의미 있는 인사이트를 제공합니다.
+        
+        ### 주요 기능
+        - 📋 **지원사업 검색**: 기업 조건에 맞는 지원사업을 쉽게 찾아보세요
+        - 📊 **기업 분석**: 지원기업들의 특성과 분포를 파악해보세요
+        - 📈 **트렌드 분석**: 시계열적 변화와 패턴을 확인해보세요
+        
+        왼쪽 사이드바의 메뉴를 통해 각 기능을 이용하실 수 있습니다.
+        """)
+
+    def show_key_metrics(self):
+        """주요 지표들을 표시합니다."""
+        # 데이터 가져오기
+        qual_df = self.data_handler.get_qualification_data()
+        company_df = self.data_handler.get_company_data()
+        
+        # 주요 지표 표시
+        col1, col2, col3, col4 = st.columns(4)
+        
+        with col1:
+            st.metric(
+                "총 지원사업 수",
+                f"{len(qual_df['BSNS_TASK_NM'].unique()):,}개"
+            )
+        
+        with col2:
+            st.metric(
+                "참여 기업 수",
+                f"{len(company_df['CMPNY_NM'].unique()):,}개"
+            )
+        
+        with col3:
+            avg_amount = qual_df['APPL_SCALE_TOT_BUDGET_PRICE'].mean()
+            st.metric(
+                "평균 지원금액",
+                f"{avg_amount:,.0f}원"
+            )
+        
+        with col4:
+            unique_regions = company_df['CMPNY_ADDR'].str.split().str[0].nunique()
+            st.metric(
+                "지원기업 분포 지역",
+                f"{unique_regions}개 지역"
+            )
+
+    def show_recent_updates(self):
+        """최근 업데이트된 지원사업 정보를 표시합니다."""
+        qual_df = self.data_handler.get_qualification_data()
+        
+        st.subheader("최근 공고 지원사업")
+        
+        # 최근 공고 순으로 정렬
+        recent_programs = qual_df.sort_values(
+            'RCRIT_PD_BEGIN_DE', 
+            ascending=False
+        ).head(5)
+        
+        # 표시할 컬럼 선택 및 이름 변경
+        display_cols = {
+            'BSNS_TASK_NM': '사업명',
+            'RCRIT_PD_BEGIN_DE': '접수 시작일',
+            'RCRIT_PD_END_DE': '접수 마감일',
+            'APPL_SCALE_UNIT_PER_MXMM_APPL_PRICE': '지원금액'
+        }
+        
+        st.dataframe(
+            recent_programs[display_cols.keys()].rename(columns=display_cols),
+            use_container_width=True,
+            hide_index=True
+        )
+
+    def show_data_overview(self):
+        """데이터 현황 개요를 표시합니다."""
+        st.subheader("데이터 현황")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.markdown("#### 지원사업 자격요건 데이터")
+            qual_df = self.data_handler.get_qualification_data()
+            st.write(f"- 데이터 기간: {qual_df['APPL_YEAR'].min()} ~ {qual_df['APPL_YEAR'].max()}")
+            st.write(f"- 총 레코드 수: {len(qual_df):,}개")
+            st.write(f"- 지원분야 수: {qual_df['APPL_REALM_NM'].nunique()}개")
+        
+        with col2:
+            st.markdown("#### 지원기업 정보 데이터")
+            company_df = self.data_handler.get_company_data()
+            st.write(f"- 총 기업 수: {len(company_df['CMPNY_NM'].unique()):,}개")
+            st.write(f"- 업종 수: {company_df['INDUTY_NM'].nunique()}개")
+            st.write(f"- 평균 업력: {company_df['업력'].mean():.1f}년")
 
     def run(self):
-        """
-        메인 애플리케이션 실행
+        """애플리케이션을 실행합니다."""
+        self.set_page_config()
+        self.show_welcome_section()
         
-        사용자 인터페이스의 세 가지 주요 부분을 관리합니다:
-        1. 대화 히스토리 표시
-        2. 사용자 입력 처리
-        3. 매칭 결과 표시
-        """
-        # 애플리케이션 헤더
-        st.title("Sport Support Navigator")
-        st.subheader("스포츠산업 지원사업 지능형 매칭 시스템")
+        # 구분선 추가
+        st.divider()
         
-        try:
-            # 주요 인터페이스 컴포넌트 실행
-            self._display_conversation_history()
-            self._handle_user_input()
+        # 주요 지표 표시
+        self.show_key_metrics()
+        
+        # 구분선 추가
+        st.divider()
+        
+        # 최근 업데이트 및 데이터 현황
+        col1, col2 = st.columns([2, 1])
+        
+        with col1:
+            self.show_recent_updates()
             
-            if st.session_state.ready_for_matching:
-                self._show_matching_results()
-                
-        except Exception as e:
-            st.error("애플리케이션 실행 중 오류가 발생했습니다. 페이지를 새로고침해 주세요.")
-            st.exception(e)
+        with col2:
+            self.show_data_overview()
 
-    def _display_conversation_history(self):
-        """
-        대화 히스토리를 시각적으로 표시합니다.
-        
-        대화 참여자를 이모지로 구분하여 표시합니다:
-        - 🤖 시스템 메시지
-        - 👤 사용자 메시지
-        """
-        # 기존 대화 히스토리 표시
-        for message in st.session_state.conversation_history:
-            if message['type'] == 'system':
-                st.markdown(f"🤖 {message['text']}")
-            else:
-                st.markdown(f"👤 {message['text']}")
-        
-        # 첫 대화 시작
-        if not st.session_state.conversation_history:
-            initial_message = self.conversation_manager.get_initial_message()
-            st.session_state.conversation_history.append({
-                'type': 'system',
-                'text': initial_message
-            })
-
-    def _handle_user_input(self):
-        try:
-            user_input = st.text_input("메시지를 입력하세요:", key="user_input")
-            
-            if user_input and user_input not in [msg['text'] for msg in st.session_state.conversation_history]:
-                # 사용자 입력 처리
-                with st.spinner('처리중...'):
-                    response = self.conversation_manager.process_user_input(user_input)
-                    
-                    # 대화 기록 업데이트
-                    st.session_state.conversation_history.append({
-                        'type': 'user',
-                        'text': user_input
-                    })
-                    st.session_state.conversation_history.append({
-                        'type': 'system',
-                        'text': response
-                    })
-                    
-                    # 상태 업데이트
-                    st.session_state.user_profile = self.conversation_manager.get_current_profile()
-                    
-                    if self.conversation_manager.is_profile_complete():
-                        st.session_state.ready_for_matching = True
-                    
-                st.rerun()
-        except Exception as e:
-            st.error(f"오류가 발생했습니다: {str(e)}")
-            # 로깅 추가
-            print(f"Error in _handle_user_input: {e}")
-
-    def _show_matching_results(self):
-        """
-        사용자 프로필에 가장 적합한 지원사업을 보여줍니다.
-        
-        각 추천 결과는 다음 정보를 포함합니다:
-        1. 사업 개요
-        2. 지원 대상
-        3. 지원 규모
-        4. 매칭 상세 점수
-        """
-        st.markdown("### 🎯 추천 지원사업")
-        st.write("수집된 정보를 바탕으로 가장 적합한 지원사업을 찾았습니다.")
-        
-        try:
-            # 매칭 결과 얻기
-            matches = self.matcher.find_matches(st.session_state.user_profile)
-            
-            # 결과 표시
-            for idx, match in enumerate(matches, 1):
-                with st.expander(
-                    f"{idx}. {match['program_name']} (매칭 점수: {match['score']:.2f})"
-                ):
-                    col1, col2 = st.columns(2)
-                    
-                    with col1:
-                        st.markdown("#### 💡 사업 개요")
-                        st.write(match['details']['BSNS_PURPS_CN'])
-                        
-                        st.markdown("#### 👥 지원 대상")
-                        st.write(match['details']['APPL_TRGET_RM_CN'])
-                        
-                    with col2:
-                        st.markdown("#### 💰 지원 규모")
-                        st.metric(
-                            label="지원금액",
-                            value=f"{match['details']['budget_normalized']:,.0f} 백만원"
-                        )
-                        
-                        st.markdown("#### 📊 매칭 상세 점수")
-                        st.write(f"- 사업 관련성: {match['relevance_score']:.2f}")
-                        st.write(f"- 규모 적합도: {match['scale_score']:.2f}")
-                        st.write(f"- 요건 부합도: {match['requirement_score']:.2f}")
-            
-            # 새로운 검색 시작 버튼
-            if st.button("새로운 검색 시작"):
-                st.session_state.clear()
-                st.experimental_rerun()
-                
-        except Exception as e:
-            st.error("매칭 결과를 표시하는 중 오류가 발생했습니다.")
-            st.exception(e)
+def main():
+    app = SportsSupportApp()
+    app.run()
 
 if __name__ == "__main__":
-    app = SportSupportNavigator()
-    app.run()
+    main()
