@@ -360,46 +360,46 @@ def main():
                 )
                 
                 if selected_company:
-                   # 뉴스 정보 표시
-                   st.markdown("### 관련 뉴스")
-                   news_items = fetch_company_news(selected_company)
-                   
-                   if news_items:
-                       for news in news_items:
-                           with st.expander(f"{news['date']} - {news['title']}"):
-                               st.write(news['summary'])
-                   else:
-                       st.info("관련 뉴스가 없습니다.")
-                   
-                   # 기업 기본 정보 표시 
-                   st.markdown("### 기업 정보")
-                   company_info = filtered_df[
-                       filtered_df['CMPNY_NM'] == selected_company
-                   ].iloc[0]
-                   
-                   info_col1, info_col2 = st.columns(2)
-                   
-                   with info_col1:
-                       st.write(f"**업종:** {company_info['INDUTY_NM']}")
-                       st.write(f"**대표자:** {company_info['RPRSNTV_NM']}")
-                   
-                   with info_col2:
-                       st.write(f"**소재지:** {company_info['CMPNY_ADDR']}")
-                       st.write(f"**지원년도:** {company_info['APPL_YEAR']}")
-               else:
-                   st.info("선택 가능한 기업이 없습니다.")
-               
-       except Exception as e:
-           st.error(f"""
-               데이터 처리 중 오류가 발생했습니다.
-               관리자에게 문의해주세요.
-               
-               오류 내용:
-               {str(e)}
-               
-               데이터 상태:
-               {company_df.dtypes if 'company_df' in locals() else '데이터 로드 실패'}
-           """)
-    
-    if __name__ == "__main__":
-       main()
+                    # 뉴스 정보 표시
+                    st.markdown("### 관련 뉴스")
+                    news_items = fetch_company_news(selected_company)
+                    
+                    if news_items:
+                        for news in news_items:
+                            with st.expander(f"{news['date']} - {news['title']}"):
+                                st.write(news['summary'])
+                    else:
+                        st.info("관련 뉴스가 없습니다.")
+                    
+                    # 기업 기본 정보 표시 
+                    st.markdown("### 기업 정보")
+                    company_info = filtered_df[
+                        filtered_df['CMPNY_NM'] == selected_company
+                    ].iloc[0]
+                    
+                    info_col1, info_col2 = st.columns(2)
+                    
+                    with info_col1:
+                        st.write(f"**업종:** {company_info['INDUTY_NM']}")
+                        st.write(f"**대표자:** {company_info['RPRSNTV_NM']}")
+                    
+                    with info_col2:
+                        st.write(f"**소재지:** {company_info['CMPNY_ADDR']}")
+                        st.write(f"**지원년도:** {company_info['APPL_YEAR']}")
+                else:
+                    st.info("선택 가능한 기업이 없습니다.")
+                
+        except Exception as e:
+            st.error(f"""
+                데이터 처리 중 오류가 발생했습니다.
+                관리자에게 문의해주세요.
+                
+                오류 내용:
+                {str(e)}
+                
+                데이터 상태:
+                {company_df.dtypes if 'company_df' in locals() else '데이터 로드 실패'}
+            """)
+
+        if __name__ == "__main__":
+        main()
