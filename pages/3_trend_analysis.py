@@ -107,12 +107,17 @@ def create_participation_trend(df):
 def analyze_qualification_trends(df):
     """지원사업 자격요건의 변화 추이를 분석하고 시각화합니다."""
     try:
+        # 문자열 'Y'/'N'을 1/0으로 변환
+        for col in ['APPL_TRGET_PREPFNTN_AT', 'APPL_TRGET_GRP_POSBL_AT', 
+                   'APPL_TRGET_INDVDL_POSBL_AT', 'STARTUP_PRIOR_AT']:
+            df[col] = df[col].map({'Y': 1, 'N': 0}).fillna(0)
+
         # 연도별 자격요건 특성 분석
         qual_trends = df.groupby('APPL_YEAR').agg({
-            'APPL_TRGET_PREPFNTN_AT': 'mean',  # 예비창업 가능 여부
-            'APPL_TRGET_GRP_POSBL_AT': 'mean',  # 단체 가능 여부
-            'APPL_TRGET_INDVDL_POSBL_AT': 'mean',  # 개인 가능 여부
-            'STARTUP_PRIOR_AT': 'mean'  # 스타트업 우선 여부
+            'APPL_TRGET_PREPFNTN_AT': 'mean',
+            'APPL_TRGET_GRP_POSBL_AT': 'mean',
+            'APPL_TRGET_INDVDL_POSBL_AT': 'mean',
+            'STARTUP_PRIOR_AT': 'mean'
         }).fillna(0)
 
         # 복합 라인 차트 생성
@@ -194,6 +199,27 @@ def analyze_support_characteristics(df):
 
     except Exception as e:
         st.error(f"지원사업 성격 분석 중 오류 발생: {str(e)}")
+        return None
+
+def analyze_diversity_trends(df):
+    """지원분야의 다양성 변화를 분석합니다."""
+    try:
+        yearly_diversity = df.groupby('APPL_YEAR')['APPL_REALM_NM'].nunique()
+        if len(yearly_diversity) >= 2:
+            early_year = yearly_diversity.index.min()
+            latest_year = yearly_diversity.index.max()
+            diversity_change = yearly_diversity.iloc[-1] - yearly_diversity.iloc[0]
+            
+            return {
+                'early_year': early_year,
+                'latest_year': latest_year,
+                'diversity_change': diversity_change,
+                'early_count': yearly_diversity.iloc[0],
+                'latest_count': yearly_diversity.iloc[-1]
+            }
+        return None
+    except Exception as e:
+        st.error(f"다양성 분석 중 오류 발생: {str(e)}")
         return None
 
 def filter_data_by_period(df, start_year, end_year):
@@ -304,10 +330,16 @@ def main():
             
             # 지원분야 다양성 분석
             st.markdown("### 지원분야 다양성 분석")
-            yearly_diversity = quals_df.groupby('APPL_YEAR')['APPL_REALM_NM'].nunique()
-            diversity_change = yearly_diversity.iloc[-1] - yearly_diversity.iloc[0]
-            
-            st.write(f"{early_year}년 대비 {latest_year}년의 지원분야가 {abs(diversity_change)}개 {'증가' if diversity_change > 0 else '감소'}했습니다.")
+            diversity_results = analyze_diversity_trends(quals_df)
+            if diversity_results:
+                st.write(
+                    f"{diversity_results['early_year']}년 대비 "
+                    f"{diversity_results['latest_year']}년의 지원분야가 "
+                    f"{abs(diversity_results['diversity_change'])}개 "
+                    f"{'증가' if diversity_results['diversity_change'] > 0 else '감소'}"
+                    f"했습니다. ({diversity_results['early_count']}개 → "
+                    f"{diversity_results['latest_count']}개)"
+                )
 
         # 기업 참여 트렌드
         st.header("기업 참여 트렌드")
