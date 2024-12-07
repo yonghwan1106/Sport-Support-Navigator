@@ -31,24 +31,46 @@ def load_search_conditions(name):
     return None
 
 def convert_df_to_excel(df):
-    """데이터프레임을 엑셀 파일로 변환합니다."""
-    output = io.BytesIO()
-    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-        df.to_excel(writer, sheet_name='검색결과', index=False)
+    """
+    데이터프레임을 Excel 파일로 변환합니다.
+    XlsxWriter 패키지가 없는 경우 openpyxl을 사용합니다.
+    """
+    try:
+        output = io.BytesIO()
         
-        # 워크시트와 워크북 객체 가져오기
-        workbook = writer.book
-        worksheet = writer.sheets['검색결과']
+        try:
+            # XlsxWriter를 사용한 변환 시도
+            with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+                df.to_excel(writer, sheet_name='검색결과', index=False)
+                
+                # 워크시트와 워크북 객체 가져오기
+                workbook = writer.book
+                worksheet = writer.sheets['검색결과']
+                
+                # 열 너비 자동 조정
+                for i, col in enumerate(df.columns):
+                    max_length = max(
+                        df[col].astype(str).str.len().max(),
+                        len(col)
+                    )
+                    worksheet.set_column(i, i, max_length + 2)
+                    
+        except (ImportError, ModuleNotFoundError):
+            # openpyxl을 사용한 대체 변환
+            with pd.ExcelWriter(output, engine='openpyxl') as writer:
+                df.to_excel(writer, sheet_name='검색결과', index=False)
         
-        # 열 너비 자동 조정
-        for i, col in enumerate(df.columns):
-            max_length = max(
-                df[col].astype(str).str.len().max(),
-                len(col)
-            )
-            worksheet.set_column(i, i, max_length + 2)
-    
-    return output.getvalue()
+        return output.getvalue()
+        
+    except Exception as e:
+        st.error(f"""
+            Excel 파일 생성 중 오류가 발생했습니다.
+            CSV 형식으로 다운로드해 주세요.
+            
+            오류 내용:
+            {str(e)}
+        """)
+        return None
 
 def convert_df_to_pdf(df):
     """데이터프레임을 PDF로 변환합니다."""
