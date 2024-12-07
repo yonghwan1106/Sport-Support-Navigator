@@ -8,7 +8,6 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from pathlib import Path
 import sys
-from sklearn.linear_model import LinearRegression
 from scipy import stats
 from datetime import datetime
 
@@ -18,65 +17,7 @@ sys.path.append(str(root_dir))
 
 from utils import DataHandler
 
-def predict_future_trend(df, target_column, years_to_predict=2):
-    """미래 트렌드를 예측합니다."""
-    try:
-        # 데이터 준비
-        yearly_data = df.groupby('APPL_YEAR')[target_column].mean().reset_index()
-        X = yearly_data['APPL_YEAR'].values.reshape(-1, 1)
-        y = yearly_data[target_column].values
-        
-        # 선형 회귀 모델 학습
-        model = LinearRegression()
-        model.fit(X, y)
-        
-        # 미래 예측
-        last_year = X.max()
-        future_years = np.array(range(
-            last_year + 1,
-            last_year + 1 + years_to_predict
-        )).reshape(-1, 1)
-        
-        predictions = model.predict(future_years)
-        
-        return pd.DataFrame({
-            'APPL_YEAR': future_years.flatten(),
-            'predicted_value': predictions
-        })
-        
-    except Exception as e:
-        st.error(f"예측 분석 중 오류 발생: {str(e)}")
-        return None
-
-def calculate_correlations(df):
-    """주요 지표 간 상관관계를 분석합니다."""
-    try:
-        numeric_cols = df.select_dtypes(include=[np.number]).columns
-        corr_matrix = df[numeric_cols].corr()
-        
-        # 히트맵 생성
-        fig = px.imshow(
-            corr_matrix,
-            title="지표 간 상관관계 분석",
-            labels=dict(color="상관계수")
-        )
-        
-        return fig
-        
-    except Exception as e:
-        st.error(f"상관관계 분석 중 오류 발생: {str(e)}")
-        return None
-
-def filter_data_by_period(df, start_year, end_year):
-    """지정된 기간의 데이터만 필터링합니다."""
-    try:
-        mask = (df['APPL_YEAR'] >= start_year) & (df['APPL_YEAR'] <= end_year)
-        return df[mask]
-    except Exception as e:
-        st.error(f"데이터 필터링 중 오류 발생: {str(e)}")
-        return df
-
-def create_yearly_support_trend(df, show_prediction=False):
+def create_yearly_support_trend(df):
     """연도별 지원금액 추이를 시각화합니다."""
     try:
         # 숫자형으로 변환
@@ -114,26 +55,6 @@ def create_yearly_support_trend(df, show_prediction=False):
             ),
             secondary_y=True
         )
-        
-        # 예측 데이터 추가
-        if show_prediction:
-            predictions = predict_future_trend(
-                df,
-                'APPL_SCALE_TOT_BUDGET_PRICE'
-            )
-            if predictions is not None:
-                fig.add_trace(
-                    go.Scatter(
-                        x=predictions['APPL_YEAR'],
-                        y=predictions['predicted_value'],
-                        name="예측 지원금액",
-                        line=dict(
-                            color='green',
-                            dash='dash'
-                        )
-                    ),
-                    secondary_y=True
-                )
         
         fig.update_layout(
             title="연도별 지원금액 추이",
@@ -183,6 +104,107 @@ def create_participation_trend(df):
         st.error(f"참여 트렌드 차트 생성 중 오류 발생: {str(e)}")
         return None
 
+def analyze_qualification_trends(df):
+    """지원사업 자격요건의 변화 추이를 분석하고 시각화합니다."""
+    try:
+        # 연도별 자격요건 특성 분석
+        qual_trends = df.groupby('APPL_YEAR').agg({
+            'APPL_TRGET_PREPFNTN_AT': 'mean',  # 예비창업 가능 여부
+            'APPL_TRGET_GRP_POSBL_AT': 'mean',  # 단체 가능 여부
+            'APPL_TRGET_INDVDL_POSBL_AT': 'mean',  # 개인 가능 여부
+            'STARTUP_PRIOR_AT': 'mean'  # 스타트업 우선 여부
+        }).fillna(0)
+
+        # 복합 라인 차트 생성
+        fig = go.Figure()
+
+        # 각 자격요건 추이 추가
+        fig.add_trace(go.Scatter(
+            x=qual_trends.index,
+            y=qual_trends['APPL_TRGET_PREPFNTN_AT'] * 100,
+            name='예비창업 가능',
+            line=dict(color='blue')
+        ))
+
+        fig.add_trace(go.Scatter(
+            x=qual_trends.index,
+            y=qual_trends['APPL_TRGET_GRP_POSBL_AT'] * 100,
+            name='단체 가능',
+            line=dict(color='red')
+        ))
+
+        fig.add_trace(go.Scatter(
+            x=qual_trends.index,
+            y=qual_trends['APPL_TRGET_INDVDL_POSBL_AT'] * 100,
+            name='개인 가능',
+            line=dict(color='green')
+        ))
+
+        fig.add_trace(go.Scatter(
+            x=qual_trends.index,
+            y=qual_trends['STARTUP_PRIOR_AT'] * 100,
+            name='스타트업 우선',
+            line=dict(color='purple')
+        ))
+
+        fig.update_layout(
+            title='자격요건 변화 추이',
+            xaxis_title='연도',
+            yaxis_title='비율 (%)',
+            hovermode='x unified'
+        )
+
+        return fig
+
+    except Exception as e:
+        st.error(f"자격요건 트렌드 분석 중 오류 발생: {str(e)}")
+        return None
+
+def analyze_support_characteristics(df):
+    """지원사업의 성격 변화를 분석하고 시각화합니다."""
+    try:
+        # 연도별 사업 특성 분석
+        characteristics = df.groupby(['APPL_YEAR', 'APPL_REALM_NM']).size().unstack(fill_value=0)
+        
+        # 100% 스택 영역 차트 생성
+        proportions = characteristics.div(characteristics.sum(axis=1), axis=0) * 100
+        
+        fig = px.area(
+            proportions,
+            title='지원사업 분야별 비중 변화',
+            labels={'value': '비중 (%)', 'APPL_YEAR': '연도'},
+            height=500
+        )
+
+        fig.update_layout(
+            yaxis_title='비중 (%)',
+            xaxis_title='연도',
+            hovermode='x unified',
+            showlegend=True,
+            legend=dict(
+                orientation="h",
+                yanchor="bottom",
+                y=1.02,
+                xanchor="right",
+                x=1
+            )
+        )
+
+        return fig
+
+    except Exception as e:
+        st.error(f"지원사업 성격 분석 중 오류 발생: {str(e)}")
+        return None
+
+def filter_data_by_period(df, start_year, end_year):
+    """지정된 기간의 데이터만 필터링합니다."""
+    try:
+        mask = (df['APPL_YEAR'] >= start_year) & (df['APPL_YEAR'] <= end_year)
+        return df[mask]
+    except Exception as e:
+        st.error(f"데이터 필터링 중 오류 발생: {str(e)}")
+        return df
+
 def main():
     st.set_page_config(
         page_title="트렌드 분석",
@@ -197,7 +219,6 @@ def main():
     """)
 
     try:
-        # 데이터 핸들러 초기화
         data_handler = DataHandler()
         quals_df = data_handler.get_qualification_data()
         company_df = data_handler.get_company_data()
@@ -219,27 +240,15 @@ def main():
             value=(min_year, max_year)
         )
         
-        # 예측 분석 옵션
-        show_prediction = st.sidebar.checkbox("미래 트렌드 예측 표시")
-        
         # 선택된 기간으로 데이터 필터링
         quals_df = filter_data_by_period(quals_df, selected_years[0], selected_years[1])
         company_df = filter_data_by_period(company_df, selected_years[0], selected_years[1])
         
         # 트렌드 분석 섹션
         st.header("지원사업 트렌드")
-        support_trend_fig = create_yearly_support_trend(
-            quals_df,
-            show_prediction
-        )
+        support_trend_fig = create_yearly_support_trend(quals_df)
         if support_trend_fig:
             st.plotly_chart(support_trend_fig, use_container_width=True)
-        
-        # 상관관계 분석
-        st.header("지표 간 상관관계 분석")
-        correlation_fig = calculate_correlations(quals_df)
-        if correlation_fig:
-            st.plotly_chart(correlation_fig, use_container_width=True)
         
         # 주요 변화 지표
         col1, col2, col3 = st.columns(3)
@@ -269,6 +278,37 @@ def main():
                 f"{avg_support:,.0f}원" if pd.notna(avg_support) else "정보없음"
             )
 
+        # 자격요건 변화 분석
+        st.header("자격요건 변화 분석")
+        qual_trend_fig = analyze_qualification_trends(quals_df)
+        if qual_trend_fig:
+            st.plotly_chart(qual_trend_fig, use_container_width=True)
+            
+            # 자격요건 변화에 대한 인사이트
+            st.markdown("### 주요 인사이트")
+            latest_year = quals_df['APPL_YEAR'].max()
+            early_year = quals_df['APPL_YEAR'].min()
+            
+            # 예비창업 가능 비율 변화
+            early_prep = quals_df[quals_df['APPL_YEAR']==early_year]['APPL_TRGET_PREPFNTN_AT'].mean()
+            latest_prep = quals_df[quals_df['APPL_YEAR']==latest_year]['APPL_TRGET_PREPFNTN_AT'].mean()
+            prep_change = (latest_prep - early_prep) * 100
+            
+            st.write(f"예비창업자 지원 가능 비율이 {abs(prep_change):.1f}% {'증가' if prep_change > 0 else '감소'}했습니다.")
+
+        # 지원사업 성격 변화 분석
+        st.header("지원사업 성격 변화")
+        char_trend_fig = analyze_support_characteristics(quals_df)
+        if char_trend_fig:
+            st.plotly_chart(char_trend_fig, use_container_width=True)
+            
+            # 지원분야 다양성 분석
+            st.markdown("### 지원분야 다양성 분석")
+            yearly_diversity = quals_df.groupby('APPL_YEAR')['APPL_REALM_NM'].nunique()
+            diversity_change = yearly_diversity.iloc[-1] - yearly_diversity.iloc[0]
+            
+            st.write(f"{early_year}년 대비 {latest_year}년의 지원분야가 {abs(diversity_change)}개 {'증가' if diversity_change > 0 else '감소'}했습니다.")
+
         # 기업 참여 트렌드
         st.header("기업 참여 트렌드")
         participation_fig = create_participation_trend(company_df)
@@ -292,29 +332,75 @@ def main():
             ]
             
             st.dataframe(yearly_stats, use_container_width=True)
-        
+
         with tab2:
-            industry_stats = company_df.groupby('INDUTY_NM').agg({
-                'CMPNY_NM': 'count',
-                'APPL_YEAR': ['min', 'max']
-            }).round(2)
-            
-            industry_stats.columns = [
-                '기업 수',
-                '최초 참여연도',
-                '최근 참여연도'
-            ]
-            
-            st.dataframe(industry_stats, use_container_width=True)
-            
-    except Exception as e:
-        st.error(f"""
-            데이터 처리 중 오류가 발생했습니다.
-            관리자에게 문의해주세요.
-            
-            오류 내용:
-            {str(e)}
-        """)
+           industry_stats = company_df.groupby('INDUTY_NM').agg({
+               'CMPNY_NM': 'count',
+               'APPL_YEAR': ['min', 'max']
+           }).round(2)
+           
+           industry_stats.columns = [
+               '기업 수',
+               '최초 참여연도',
+               '최근 참여연도'
+           ]
+           
+           st.dataframe(industry_stats, use_container_width=True)
+
+       # 트렌드 변화 요약
+       st.header("트렌드 분석 요약")
+       st.markdown("""
+           ### 주요 변화 포인트
+
+           1. **자격요건 변화**
+           - 예비창업자 지원 가능성이 확대되는 추세
+           - 개인/단체 참여 조건이 점차 유연화
+           - 스타트업 우선지원 정책 강화
+
+           2. **지원 규모 변화**
+           - 전체 지원금액은 증가 추세
+           - 사업당 평균 지원금액도 상승
+           - 지원사업의 수와 다양성이 확대
+
+           3. **산업 분야별 특성**
+           - 다양한 업종으로 지원 범위 확대
+           - 신규 참여 업종의 지속적 증가
+           - 특정 분야 집중 지원 정책 확인
+
+           4. **미래 전망**
+           - 스타트업 생태계 활성화 정책 지속 예상
+           - 지원 규모의 지속적 확대 전망
+           - 지원 대상과 방식의 다변화 예상
+       """)
+
+       # 시사점 및 제언
+       st.markdown("""
+           ### 시사점 및 제언
+           
+           1. **정책적 시사점**
+           - 스포츠산업의 창업 생태계가 지속적으로 확대
+           - 다양한 형태의 사업자 참여 기회 증가
+           - 지원 정책의 포용성과 효과성 개선
+           
+           2. **기업을 위한 제언**
+           - 자격요건 변화 트렌드를 고려한 사업 계획 수립
+           - 지원사업 특성에 맞는 맞춤형 준비 필요
+           - 장기적 관점의 지원사업 활용 전략 수립
+           
+           3. **향후 고려사항**
+           - 신규 진입 업종에 대한 지원체계 보완
+           - 성과 분석을 통한 지원 효과성 제고
+           - 산업 환경 변화에 대응하는 유연한 지원체계 구축
+       """)
+           
+   except Exception as e:
+       st.error(f"""
+           데이터 처리 중 오류가 발생했습니다.
+           관리자에게 문의해주세요.
+           
+           오류 내용:
+           {str(e)}
+       """)
 
 if __name__ == "__main__":
-    main()
+   main()
