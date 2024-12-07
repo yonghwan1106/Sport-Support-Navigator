@@ -72,7 +72,7 @@ class SportsSupportApp:
             
             st.sidebar.markdown("### 데이터 품질 정보")
             st.sidebar.write(f"총 레코드 수: {total_records:,}")
-            st.sidebar.write(f"유효한 기업명 수: {valid_companies:,}")
+            # st.sidebar.write(f"유효한 기업명 수: {valid_companies:,}")
             st.sidebar.write(f"유효한 업력 데이터 수: {valid_ages:,}")
         except Exception as e:
             st.error(f"데이터 품질 로깅 중 오류: {str(e)}")
