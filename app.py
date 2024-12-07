@@ -1,6 +1,8 @@
 # 파일 위치: sports-industry-support/app.py
 
 import streamlit as st
+import pandas as pd
+import numpy as np
 from utils import DataHandler
 
 # 페이지 설정을 가장 먼저 실행
@@ -10,6 +12,32 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
+
+def get_clean_company_age(company_df):
+    """업력 데이터를 정제하고 계산합니다."""
+    try:
+        # 숫자형으로 변환
+        company_df['업력'] = pd.to_numeric(company_df['업력'], errors='coerce')
+        
+        # 이상치 제거
+        company_df.loc[company_df['업력'] > 50, '업력'] = np.nan
+        company_df.loc[company_df['업력'] < 0, '업력'] = np.nan
+        
+        # 유효한 업력 데이터만의 평균 계산
+        valid_age = company_df['업력'].dropna()
+        return valid_age.mean() if not valid_age.empty else 0
+        
+    except Exception:
+        return 0
+
+def get_valid_company_count(company_df):
+    """유효한 참여 기업 수를 계산합니다."""
+    try:
+        # 기업명이 있는 경우만 카운트
+        valid_companies = company_df['CMPNY_NM'].dropna().unique()
+        return len(valid_companies)
+    except Exception:
+        return 0
 
 class SportsSupportApp:
     """
@@ -26,14 +54,28 @@ class SportsSupportApp:
             # 데이터 핸들러 초기화
             self.data_handler = DataHandler()
         except Exception as e:
-            st.error("""
+            st.error(f"""
                 애플리케이션 초기화 중 오류가 발생했습니다.
                 관리자에게 문의해주세요.
                 
                 오류 내용:
-                {}
-            """.format(str(e)))
+                {str(e)}
+            """)
             st.stop()
+    
+    def log_data_quality(self, company_df):
+        """데이터 품질 정보를 로깅합니다."""
+        try:
+            total_records = len(company_df)
+            valid_companies = len(company_df['CMPNY_NM'].dropna())
+            valid_ages = len(company_df['업력'].dropna())
+            
+            st.sidebar.markdown("### 데이터 품질 정보")
+            st.sidebar.write(f"총 레코드 수: {total_records:,}")
+            st.sidebar.write(f"유효한 기업명 수: {valid_companies:,}")
+            st.sidebar.write(f"유효한 업력 데이터 수: {valid_ages:,}")
+        except Exception as e:
+            st.error(f"데이터 품질 로깅 중 오류: {str(e)}")
     
     def show_welcome_section(self):
         """
@@ -41,10 +83,8 @@ class SportsSupportApp:
         시스템의 주요 기능과 사용 방법을 소개합니다.
         """
         try:
-            # 메인 제목
             st.title("🎯 스포츠산업 지원사업 분석 시스템")
             
-            # 시스템 소개
             st.markdown("""
             이 시스템은 스포츠산업 지원사업의 자격요건과 지원기업 정보를 종합적으로 분석하여 
             의미 있는 인사이트를 제공합니다.
@@ -60,35 +100,31 @@ class SportsSupportApp:
             st.error(f"환영 섹션 표시 중 오류 발생: {str(e)}")
 
     def show_key_metrics(self):
-        """
-        주요 지표들을 표시합니다.
-        전체 지원사업 수, 참여 기업 수 등의 핵심 정보를 보여줍니다.
-        """
+        """주요 지표들을 표시합니다."""
         try:
-            # 로딩 상태 표시
             with st.spinner('주요 지표를 불러오는 중...'):
-                # 필요한 데이터 가져오기
+                # 데이터 로드
                 qual_df = self.data_handler.get_qualification_data()
                 company_df = self.data_handler.get_company_data()
                 
-                # 4개의 컬럼으로 지표 표시
+                # 데이터 품질 로깅
+                self.log_data_quality(company_df)
+                
                 col1, col2, col3, col4 = st.columns(4)
                 
-                # 총 지원사업 수
                 with col1:
                     st.metric(
                         "총 지원사업 수",
                         f"{len(qual_df['BSNS_TASK_NM'].unique()):,}개"
                     )
                 
-                # 참여 기업 수
                 with col2:
+                    valid_company_count = get_valid_company_count(company_df)
                     st.metric(
                         "참여 기업 수",
-                        f"{len(company_df['CMPNY_NM'].unique()):,}개"
+                        f"{valid_company_count:,}개"
                     )
                 
-                # 평균 지원금액
                 with col3:
                     avg_amount = qual_df['APPL_SCALE_TOT_BUDGET_PRICE'].mean()
                     st.metric(
@@ -96,9 +132,8 @@ class SportsSupportApp:
                         f"{avg_amount:,.0f}원"
                     )
                 
-                # 지원기업 분포 지역 수
                 with col4:
-                    unique_regions = len(company_df['지역'].unique())
+                    unique_regions = company_df['지역'].dropna().nunique()
                     st.metric(
                         "지원기업 분포 지역",
                         f"{unique_regions}개 지역"
@@ -150,9 +185,10 @@ class SportsSupportApp:
             with col2:
                 st.markdown("#### 지원기업 정보 데이터")
                 company_df = self.data_handler.get_company_data()
-                st.write(f"- 총 기업 수: {len(company_df['CMPNY_NM'].unique()):,}개")
-                st.write(f"- 업종 수: {company_df['INDUTY_NM'].nunique()}개")
-                st.write(f"- 평균 업력: {company_df['업력'].mean():.1f}년")
+                avg_age = get_clean_company_age(company_df)
+                st.write(f"- 총 기업 수: {get_valid_company_count(company_df):,}개")
+                st.write(f"- 업종 수: {company_df['INDUTY_NM'].dropna().nunique()}개")
+                st.write(f"- 평균 업력: {avg_age:.1f}년")
                 
         except Exception as e:
             st.error(f"데이터 현황 표시 중 오류 발생: {str(e)}")
@@ -160,24 +196,14 @@ class SportsSupportApp:
     def run(self):
         """애플리케이션을 실행합니다."""
         try:
-            # 환영 섹션 표시
             self.show_welcome_section()
-            
-            # 구분선 추가
             st.divider()
-            
-            # 주요 지표 표시
             self.show_key_metrics()
-            
-            # 구분선 추가
             st.divider()
             
-            # 최근 업데이트와 데이터 현황을 나란히 표시
             col1, col2 = st.columns([2, 1])
-            
             with col1:
                 self.show_recent_updates()
-                
             with col2:
                 self.show_data_overview()
                 
