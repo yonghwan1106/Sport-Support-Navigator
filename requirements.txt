@@ -22,3 +22,5 @@ pytest==7.4.4
 
 # File Handling
 pathlib==1.0.1
+
+scikit-learn>=1.0.2
