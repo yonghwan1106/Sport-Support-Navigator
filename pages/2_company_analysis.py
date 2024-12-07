@@ -31,14 +31,18 @@ def preprocess_region(df):
 def clean_company_age(df):
     """업력 데이터를 정제합니다."""
     if '업력' in df.columns:
-        # 숫자로 변환 가능한 데이터만 유지
-        df['업력'] = pd.to_numeric(df['업력'], errors='coerce')
+        # 문자열로 된 숫자를 처리하기 위한 전처리
+        df['업력'] = df['업력'].astype(str).str.extract('(\d+)').astype(float)
         
-        # 비현실적인 값 제거 (예: 100년 이상)
-        df.loc[df['업력'] > 100, '업력'] = np.nan
+        # 결측치 및 이상치 처리
+        df.loc[df['업력'].isna(), '업력'] = np.nan  # 명시적인 결측치 처리
+        df.loc[df['업력'] > 50, '업력'] = np.nan    # 50년 초과 업력은 이상치로 처리
+        df.loc[df['업력'] < 0, '업력'] = np.nan     # 음수 업력 처리
         
-        # 음수 값 제거
-        df.loc[df['업력'] < 0, '업력'] = np.nan
+        # 이상치 처리 결과 로깅
+        print(f"업력 데이터 처리 결과:")
+        print(f"- 유효한 업력 데이터 수: {df['업력'].notna().sum()}")
+        print(f"- 평균 업력: {df['업력'].mean():.1f}년")
     return df
 
 def create_korea_choropleth(df):
@@ -218,11 +222,15 @@ def main():
         data_handler = DataHandler()
         company_df = data_handler.get_company_data()
 
-        # 데이터 전처리
+        # 데이터 전처리 순서 조정
         company_df = ensure_numeric(company_df, 'APPL_YEAR')
-        company_df = ensure_numeric(company_df, '업력')
-        company_df = preprocess_region(company_df)  # 지역 정보 추출
-        company_df = clean_company_age(company_df)
+        company_df = preprocess_region(company_df)
+        company_df = clean_company_age(company_df)  # 업력 데이터 정제
+        
+        # 전처리된 데이터 품질 확인
+        st.sidebar.markdown("### 데이터 품질 정보")
+        st.sidebar.write(f"총 기업 수: {len(company_df)}")
+        st.sidebar.write(f"유효한 업력 데이터 수: {company_df['업력'].notna().sum()}")
 
         # 사이드바 필터
         with st.sidebar:
