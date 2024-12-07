@@ -21,6 +21,26 @@ def ensure_numeric(df, column):
         df[column] = pd.to_numeric(df[column], errors='coerce')
     return df
 
+def preprocess_region(df):
+    """주소에서 시/도 정보를 추출합니다."""
+    if 'CMPNY_ADDR' in df.columns:
+        # 주소에서 첫 번째 시/도 단위 추출
+        df['지역'] = df['CMPNY_ADDR'].str.extract(r'(서울|부산|대구|인천|광주|대전|울산|세종|경기|강원|충북|충남|전북|전남|경북|경남|제주)')
+    return df
+
+def clean_company_age(df):
+    """업력 데이터를 정제합니다."""
+    if '업력' in df.columns:
+        # 숫자로 변환 가능한 데이터만 유지
+        df['업력'] = pd.to_numeric(df['업력'], errors='coerce')
+        
+        # 비현실적인 값 제거 (예: 100년 이상)
+        df.loc[df['업력'] > 100, '업력'] = np.nan
+        
+        # 음수 값 제거
+        df.loc[df['업력'] < 0, '업력'] = np.nan
+    return df
+
 def create_korea_choropleth(df):
     """대한민국 지도 기반의 기업 분포 시각화를 생성합니다."""
     try:
@@ -201,6 +221,8 @@ def main():
         # 데이터 전처리
         company_df = ensure_numeric(company_df, 'APPL_YEAR')
         company_df = ensure_numeric(company_df, '업력')
+        company_df = preprocess_region(company_df)  # 지역 정보 추출
+        company_df = clean_company_age(company_df)
 
         # 사이드바 필터
         with st.sidebar:
