@@ -1,7 +1,4 @@
 # 파일 위치: sports-industry-support/pages/3_trend_analysis.py
-#
-# 이 파일은 스포츠산업 지원사업의 시계열적 변화를 분석하고 시각화하는
-# 트렌드 분석 페이지를 구현합니다.
 
 import streamlit as st
 import pandas as pd
@@ -11,6 +8,9 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from pathlib import Path
 import sys
+from sklearn.linear_model import LinearRegression
+from scipy import stats
+from datetime import datetime
 
 # 프로젝트 루트 디렉토리를 파이썬 경로에 추가
 root_dir = Path(__file__).parent.parent
@@ -18,16 +18,66 @@ sys.path.append(str(root_dir))
 
 from utils import DataHandler
 
-def create_yearly_support_trend(df):
-    """
-    연도별 지원금액 추이를 복합 그래프로 시각화합니다.
-    
-    매개변수:
-        df (DataFrame): 지원사업 데이터
+def predict_future_trend(df, target_column, years_to_predict=2):
+    """미래 트렌드를 예측합니다."""
+    try:
+        # 데이터 준비
+        yearly_data = df.groupby('APPL_YEAR')[target_column].mean().reset_index()
+        X = yearly_data['APPL_YEAR'].values.reshape(-1, 1)
+        y = yearly_data[target_column].values
         
-    반환값:
-        plotly Figure: 연도별 지원금액 추이 그래프
-    """
+        # 선형 회귀 모델 학습
+        model = LinearRegression()
+        model.fit(X, y)
+        
+        # 미래 예측
+        last_year = X.max()
+        future_years = np.array(range(
+            last_year + 1,
+            last_year + 1 + years_to_predict
+        )).reshape(-1, 1)
+        
+        predictions = model.predict(future_years)
+        
+        return pd.DataFrame({
+            'APPL_YEAR': future_years.flatten(),
+            'predicted_value': predictions
+        })
+        
+    except Exception as e:
+        st.error(f"예측 분석 중 오류 발생: {str(e)}")
+        return None
+
+def calculate_correlations(df):
+    """주요 지표 간 상관관계를 분석합니다."""
+    try:
+        numeric_cols = df.select_dtypes(include=[np.number]).columns
+        corr_matrix = df[numeric_cols].corr()
+        
+        # 히트맵 생성
+        fig = px.imshow(
+            corr_matrix,
+            title="지표 간 상관관계 분석",
+            labels=dict(color="상관계수")
+        )
+        
+        return fig
+        
+    except Exception as e:
+        st.error(f"상관관계 분석 중 오류 발생: {str(e)}")
+        return None
+
+def filter_data_by_period(df, start_year, end_year):
+    """지정된 기간의 데이터만 필터링합니다."""
+    try:
+        mask = (df['APPL_YEAR'] >= start_year) & (df['APPL_YEAR'] <= end_year)
+        return df[mask]
+    except Exception as e:
+        st.error(f"데이터 필터링 중 오류 발생: {str(e)}")
+        return df
+
+def create_yearly_support_trend(df, show_prediction=False):
+    """연도별 지원금액 추이를 시각화합니다."""
     try:
         # 숫자형으로 변환
         df['APPL_YEAR'] = pd.to_numeric(df['APPL_YEAR'], errors='coerce')
@@ -44,7 +94,7 @@ def create_yearly_support_trend(df):
         # 복합 그래프 생성
         fig = make_subplots(specs=[[{"secondary_y": True}]])
         
-        # 총 지원금액 추이 (막대 그래프)
+        # 실제 데이터 추가
         fig.add_trace(
             go.Bar(
                 x=yearly_stats.index,
@@ -55,7 +105,6 @@ def create_yearly_support_trend(df):
             secondary_y=False
         )
         
-        # 평균 지원금액 추이 (선 그래프)
         fig.add_trace(
             go.Scatter(
                 x=yearly_stats.index,
@@ -66,7 +115,26 @@ def create_yearly_support_trend(df):
             secondary_y=True
         )
         
-        # 그래프 레이아웃 설정
+        # 예측 데이터 추가
+        if show_prediction:
+            predictions = predict_future_trend(
+                df,
+                'APPL_SCALE_TOT_BUDGET_PRICE'
+            )
+            if predictions is not None:
+                fig.add_trace(
+                    go.Scatter(
+                        x=predictions['APPL_YEAR'],
+                        y=predictions['predicted_value'],
+                        name="예측 지원금액",
+                        line=dict(
+                            color='green',
+                            dash='dash'
+                        )
+                    ),
+                    secondary_y=True
+                )
+        
         fig.update_layout(
             title="연도별 지원금액 추이",
             xaxis_title="연도",
@@ -83,15 +151,7 @@ def create_yearly_support_trend(df):
         return None
 
 def create_participation_trend(df):
-    """
-    기업 참여 트렌드를 시각화합니다.
-    
-    매개변수:
-        df (DataFrame): 기업 정보 데이터
-        
-    반환값:
-        plotly Figure: 참여 트렌드 그래프
-    """
+    """기업 참여 트렌드를 시각화합니다."""
     try:
         # 숫자형으로 변환
         df['APPL_YEAR'] = pd.to_numeric(df['APPL_YEAR'], errors='coerce')
@@ -124,14 +184,12 @@ def create_participation_trend(df):
         return None
 
 def main():
-    # 페이지 기본 설정
     st.set_page_config(
         page_title="트렌드 분석",
         page_icon="📈",
         layout="wide"
     )
     
-    # 페이지 제목과 설명
     st.title("📈 스포츠산업 지원사업 트렌드 분석")
     st.markdown("""
         이 페이지에서는 스포츠산업 지원사업의 시계열적 변화를 분석합니다.
@@ -141,8 +199,6 @@ def main():
     try:
         # 데이터 핸들러 초기화
         data_handler = DataHandler()
-        
-        # 데이터 로드
         quals_df = data_handler.get_qualification_data()
         company_df = data_handler.get_company_data()
         
@@ -150,20 +206,45 @@ def main():
         for df in [quals_df, company_df]:
             if 'APPL_YEAR' in df.columns:
                 df['APPL_YEAR'] = pd.to_numeric(df['APPL_YEAR'], errors='coerce')
-
+        
+        # 사이드바 - 분석 기간 설정
+        st.sidebar.header("분석 기간 설정")
+        min_year = int(min(quals_df['APPL_YEAR'].min(), company_df['APPL_YEAR'].min()))
+        max_year = int(max(quals_df['APPL_YEAR'].max(), company_df['APPL_YEAR'].max()))
+        
+        selected_years = st.sidebar.slider(
+            "분석 기간 선택",
+            min_value=min_year,
+            max_value=max_year,
+            value=(min_year, max_year)
+        )
+        
+        # 예측 분석 옵션
+        show_prediction = st.sidebar.checkbox("미래 트렌드 예측 표시")
+        
+        # 선택된 기간으로 데이터 필터링
+        quals_df = filter_data_by_period(quals_df, selected_years[0], selected_years[1])
+        company_df = filter_data_by_period(company_df, selected_years[0], selected_years[1])
+        
         # 트렌드 분석 섹션
         st.header("지원사업 트렌드")
-        
-        # 지원금액 트렌드
-        support_trend_fig = create_yearly_support_trend(quals_df)
+        support_trend_fig = create_yearly_support_trend(
+            quals_df,
+            show_prediction
+        )
         if support_trend_fig:
             st.plotly_chart(support_trend_fig, use_container_width=True)
+        
+        # 상관관계 분석
+        st.header("지표 간 상관관계 분석")
+        correlation_fig = calculate_correlations(quals_df)
+        if correlation_fig:
+            st.plotly_chart(correlation_fig, use_container_width=True)
         
         # 주요 변화 지표
         col1, col2, col3 = st.columns(3)
         
         with col1:
-            # 전년 대비 증가율 계산
             yearly_mean = quals_df.groupby('APPL_YEAR')[
                 'APPL_SCALE_TOT_BUDGET_PRICE'
             ].mean()
@@ -196,7 +277,6 @@ def main():
         
         # 상세 통계
         st.header("상세 통계")
-        
         tab1, tab2 = st.tabs(["연도별 통계", "업종별 통계"])
         
         with tab1:
@@ -211,10 +291,7 @@ def main():
                 '총 지원금액'
             ]
             
-            st.dataframe(
-                yearly_stats,
-                use_container_width=True
-            )
+            st.dataframe(yearly_stats, use_container_width=True)
         
         with tab2:
             industry_stats = company_df.groupby('INDUTY_NM').agg({
@@ -228,10 +305,7 @@ def main():
                 '최근 참여연도'
             ]
             
-            st.dataframe(
-                industry_stats,
-                use_container_width=True
-            )
+            st.dataframe(industry_stats, use_container_width=True)
             
     except Exception as e:
         st.error(f"""
@@ -240,10 +314,6 @@ def main():
             
             오류 내용:
             {str(e)}
-            
-            데이터 상태:
-            {quals_df.dtypes if 'quals_df' in locals() else '자격요건 데이터 로드 실패'}
-            {company_df.dtypes if 'company_df' in locals() else '기업정보 데이터 로드 실패'}
         """)
 
 if __name__ == "__main__":
