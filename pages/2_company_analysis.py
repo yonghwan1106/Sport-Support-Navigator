@@ -389,17 +389,17 @@ def main():
                 else:
                     st.info("선택 가능한 기업이 없습니다.")
                 
-        except Exception as e:
-            st.error(f"""
-                데이터 처리 중 오류가 발생했습니다.
-                관리자에게 문의해주세요.
-                
-                오류 내용:
-                {str(e)}
-                
-                데이터 상태:
-                {company_df.dtypes if 'company_df' in locals() else '데이터 로드 실패'}
-            """)
+    except Exception as e:
+        st.error(f"""
+            데이터 처리 중 오류가 발생했습니다.
+            관리자에게 문의해주세요.
+            
+            오류 내용:
+            {str(e)}
+            
+            데이터 상태:
+            {company_df.dtypes if 'company_df' in locals() else '데이터 로드 실패'}
+        """)
 
-        if __name__ == "__main__":
-        main()
+if __name__ == "__main__":
+main()
