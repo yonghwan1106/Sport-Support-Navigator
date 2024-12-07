@@ -401,5 +401,5 @@ def main():
             {company_df.dtypes if 'company_df' in locals() else '데이터 로드 실패'}
         """)
 
-if __name__ == "__main__":
-main()
+    if __name__ == "__main__":
+    main()
